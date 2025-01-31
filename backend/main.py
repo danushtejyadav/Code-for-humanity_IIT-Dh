@@ -16,11 +16,15 @@ hugging_face_api_keys = [
     os.getenv("HUGGING_FACE_API_KEY_2")
 ]
 api_key_index = 0  # To track alternating API keys
-groq_client = Groq(api_key=os.getenv("GROQ_API_KEY1"))
+groq_client = Groq(api_key=os.getenv("GROQ_API_KEY2"))
 
-# Create necessary folders
-os.makedirs("memory", exist_ok=True)
+# Create necessary folders and clear memory folder on startup
 os.makedirs("s1", exist_ok=True)
+if os.path.exists("memory"):
+    for file in os.listdir("memory"):
+        os.remove(os.path.join("memory", file))
+else:
+    os.makedirs("memory")
 
 def get_next_api_key():
     global api_key_index
@@ -30,7 +34,7 @@ def get_next_api_key():
 
 # Image Generation Function
 def image_gen(prompt, scene_index):
-    headers = {"Authorization": f"Bearer {get_next_api_key()}"}
+    headers = {"Authorization": f"{get_next_api_key()}"}
     API_URL = "https://api-inference.huggingface.co/models/black-forest-labs/FLUX.1-dev"
     try:
         response = requests.post(API_URL, headers=headers, json={"inputs": prompt})
@@ -70,13 +74,19 @@ def dialogue_gen(scene):
     return chat_completion.choices[0].message.content
 
 # Image Prompt Generation
-def image_prompt_gen(scene):
+def image_prompt_gen(full_story_text, previous_prompts, scene):
     sys_msg = (
-        "You are given a scene description. Generate a detailed and descriptive prompt for an image generation model. "
-        "Include specific visual details like colors, objects, and actions."
-        "The prompt should be animatic-friendly."
+        "You are given a scene description, the full story, and previous prompts. "
+        "Generate a detailed and descriptive prompt for an image generation model. "
+        "Include specific visual details like colors, objects, and actions. "
+        "Ensure consistency with the full story and previous prompts."
     )
-    convo = [{"role": "system", "content": sys_msg}, {"role": "user", "content": scene}]
+    convo = [
+        {"role": "system", "content": sys_msg},
+        {"role": "user", "content": f"Full Story: {full_story_text}"},
+        {"role": "user", "content": f"Previous Prompts: {previous_prompts}"},
+        {"role": "user", "content": f"Scene: {scene}"}
+    ]
     chat_completion = groq_client.chat.completions.create(messages=convo, model="llama3-70b-8192")
     return chat_completion.choices[0].message.content
 
@@ -88,25 +98,28 @@ def generate_story(user_prompt):
             db["full_story"] = full_story(user_prompt)
             db["scenes"] = []
             db["scene_index"] = 1
-            db["images"] = []
             db["generating"] = True
-
         full_story_text = db["full_story"]
         scenes = db["scenes"]
         scene_index = db["scene_index"]
-        images = db["images"]
         generating = db["generating"]
 
     print("## Full Story:")
     print(full_story_text)
 
+    # List to store generated image paths (not stored in shelve)
+    image_paths = []
+    image_lock = threading.Lock()  # Lock for thread-safe updates to image_paths
+
     # Scene Generation Loop
     while generating:
         with shelve.open("memory/story_memory") as db:
             scene = scene_generator(full_story_text, db["scenes"])
-            pattern =r"(?i)\bscene generation complete(d?)\b" 
-            if re.fullmatch(pattern, scene.strip()):
+            # Check for completion
+            pattern = r"(?i)\bscene\s+generation\s+complete\b"
+            if re.search(pattern, scene.strip()):
                 db["generating"] = False
+                print("Scene generation complete. Stopping further scene generation.")
                 break
 
             # Append the new scene to memory
@@ -121,17 +134,16 @@ def generate_story(user_prompt):
         print(scene)
         print(f"**Dialogue:** {dialogue}")
 
-        # Generate image prompt
-        image_prompt = image_prompt_gen(image_description)
+        # Generate image prompt with memory of full story and previous prompts
+        previous_prompts = [s["content"] for s in scenes[:-1]]  # Exclude current scene
+        image_prompt = image_prompt_gen(full_story_text, previous_prompts, image_description)
 
         # Generate image in a separate thread
         def save_and_display_image():
             image_path = image_gen(image_prompt, scene_index)
             if image_path:
-                with shelve.open("memory/story_memory") as db:
-                    images = db["images"]
-                    images.append(image_path)
-                    db["images"] = images
+                with image_lock:  # Ensure thread-safe updates to image_paths
+                    image_paths.append(image_path)
                 print(f"Image saved for Scene {scene_index}: {image_path}")
 
         threading.Thread(target=save_and_display_image).start()
@@ -141,6 +153,9 @@ def generate_story(user_prompt):
             db["scene_index"] = scene_index
 
     print("## Story Generation Complete. Waiting for images to finish rendering...")
+    print("Generated Images:")
+    for img in image_paths:
+        print(img)
 
 # Main Function
 def main():
