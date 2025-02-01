@@ -200,26 +200,65 @@
     margin-bottom: 2rem;
   }
   
-  .text-response, .image-response, 
-  .video-reference, .document-insights {
-    background-color: white;
-    border-radius: var(--border-radius);
-    padding: 2rem;
-    box-shadow: 0 10px 20px rgba(26, 95, 122, 0.1);
-    border: 2px solid var(--primary-blue);
-    transition: transform 0.3s ease;
-  }
-  
-  .text-response:hover, .image-response:hover, 
-  .video-reference:hover, .document-insights:hover {
-    transform: translateY(-10px);
-  }
-  
-  .text-response h3, .image-response h3, 
-  .video-reference h3, .document-insights h3 {
-    color: var(--primary-blue);
-    margin-bottom: 1rem;
-  }
+.response-grid {
+  display: grid;
+  grid-template-columns: 3fr 1fr; /* Left side (Text Response) is 3x larger */
+  gap: 20px; /* Space between the columns */
+}
+
+.text-response {
+  background-color: white;
+  border-radius: var(--border-radius);
+  padding: 2rem;
+  box-shadow: 0 10px 20px rgba(26, 95, 122, 0.1);
+  border: 2px solid var(--primary-blue);
+  transition: transform 0.3s ease;
+}
+
+.text-response:hover {
+  transform: translateY(-10px);
+}
+.language-select {
+  width: 100%;
+  max-width: 200px; /* Sets a max width for the dropdown */
+  padding: 0.5rem;
+  border: 1px solid var(--primary-blue);
+  border-radius: var(--border-radius);
+  background-color: white;
+  font-size: 1rem;
+  margin-top: 10px; /* Adds space above the dropdown */
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  transition: border 0.3s ease;
+}
+
+.language-select:hover {
+  border-color: var(--primary-blue);
+}
+
+.language-select:focus {
+  outline: none;
+  border-color: var(--primary-blue);
+  box-shadow: 0 0 10px rgba(26, 95, 122, 0.3);
+}
+.image-response, .video-reference {
+  background-color: white;
+  border-radius: var(--border-radius);
+  padding: 2rem;
+  box-shadow: 0 10px 20px rgba(26, 95, 122, 0.1);
+  border: 2px solid var(--primary-blue);
+  transition: transform 0.3s ease;
+}
+
+.image-response:hover, .video-reference:hover {
+  transform: translateY(-10px);
+}
+
+.text-response h3, .image-response h3, 
+.video-reference h3 {
+  color: var(--primary-blue);
+  margin-bottom: 1rem;
+}
+
   
     .modal {
         display: none;

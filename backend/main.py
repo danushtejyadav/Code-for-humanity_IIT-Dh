@@ -6,6 +6,15 @@ from datetime import datetime
 from groq import Groq
 import shelve
 import re
+from pydub import AudioSegment
+import base64
+from flask import Flask, request, jsonify , render_template
+from flask_socketio import SocketIO
+from flask_cors import CORS
+
+app = Flask(__name__)
+CORS(app)
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading')
 
 # Load environment variables
 load_dotenv()
@@ -17,6 +26,11 @@ hugging_face_api_keys = [
 ]
 api_key_index = 0  # To track alternating API keys
 groq_client = Groq(api_key=os.getenv("GROQ_API_KEY2"))
+bhashini_key = os.getenv('BHASHINI_API_KEY')
+
+AudioSegment.converter = r"ffmpeg.exe"
+TTS_FOLDER = 'tts_uploads'
+os.makedirs(TTS_FOLDER, exist_ok=True)
 
 # Create necessary folders and clear memory folder on startup
 os.makedirs("s1", exist_ok=True)
@@ -51,7 +65,12 @@ def image_gen(prompt, scene_index):
 
 # Full Story Generation
 def full_story(prompt):
-    sys_msg = "Generate a short story based on the given prompt."
+    sys_msg = (
+        'You are an expert creative writer specializing in immersive storytelling. '
+        'Generate a well-structured, engaging, and coherent short story based on the given prompt. '
+        'Ensure a clear narrative arc with an intriguing beginning, well-paced development, and a satisfying conclusion. '
+        'Use vivid yet concise descriptions to create a strong sense of place and atmosphere. '
+        )
     convo = [{"role": "system", "content": sys_msg}, {"role": "user", "content": prompt}]
     chat_completion = groq_client.chat.completions.create(messages=convo, model="llama3-70b-8192")
     return chat_completion.choices[0].message.content
@@ -59,16 +78,25 @@ def full_story(prompt):
 # Scene Generation
 def scene_generator(full_story_text, memory):
     sys_msg = (
-        "You are given a full short story. Generate one scene at a time based on the story. "
-        "If the story is complete, return 'Scene generation complete'."
+        "You are an expert at cinematic scene generation. Given a full short story, generate one scene at a time "
+        "in a way that maintains narrative continuity. Each scene should be self-contained yet contribute to the overarching plot. "
+        "Ensure vivid, highly visual descriptions focusing on setting, character actions, and emotions. "
+        "Avoid redundancy while ensuring seamless transitions between scenes. "
+        "If all scenes have been generated, respond with 'Scene generation complete'."
     )
+
     convo = memory + [{"role": "system", "content": sys_msg}, {"role": "user", "content": full_story_text}]
     chat_completion = groq_client.chat.completions.create(messages=convo, model="llama3-70b-8192")
     return chat_completion.choices[0].message.content
 
 # Dialogue Generation
 def dialogue_gen(scene):
-    sys_msg = "Generate a dialogue for one character based on the given scene."
+    sys_msg = (
+        "You are a dialogue expert, skilled at crafting natural and emotionally engaging conversations. "
+        "Given a scene, generate a compelling dialogue for one character that fits within the context. "
+        "The dialogue should be authentic, expressive, and contribute to character development or plot progression. "
+        "Ensure it remains concise yet impactful, matching the character’s personality and the overall mood of the story."
+    )
     convo = [{"role": "system", "content": sys_msg}, {"role": "user", "content": scene}]
     chat_completion = groq_client.chat.completions.create(messages=convo, model="llama3-70b-8192")
     return chat_completion.choices[0].message.content
@@ -76,10 +104,11 @@ def dialogue_gen(scene):
 # Image Prompt Generation
 def image_prompt_gen(full_story_text, previous_prompts, scene):
     sys_msg = (
-        "You are given a scene description, the full story, and previous prompts. "
-        "Generate a detailed and descriptive prompt for an image generation model. "
-        "Include specific visual details like colors, objects, and actions. "
-        "Ensure consistency with the full story and previous prompts."
+        "You are a professional concept artist and scene designer. "
+        "Given a scene description, the full story, and previous prompts, generate a highly detailed and realistic image prompt "
+        "for an AI image generation model. "
+        "Your prompt should emphasize key visual elements such as lighting, color tones, character expressions, background details, and dynamic actions. "
+        "Ensure consistency with previous images and the overall story setting."
     )
     convo = [
         {"role": "system", "content": sys_msg},
@@ -89,6 +118,79 @@ def image_prompt_gen(full_story_text, previous_prompts, scene):
     ]
     chat_completion = groq_client.chat.completions.create(messages=convo, model="llama3-70b-8192")
     return chat_completion.choices[0].message.content
+
+# ASR + TTS Function
+def bhashini_tts(query):
+    target_lang = "kn"
+    service_id = "ai4bharat/indictrans-v2-all-gpu--t4"
+
+    # Determine TTS service ID based on target language
+    if target_lang in ["hi", "as", "gu", "mr", "or", "pa", "bn"]:
+        service_id_tts = "ai4bharat/indic-tts-coqui-indo_aryan-gpu--t4"
+    elif target_lang in ["kn", "ml", "ta", "te"]:
+        service_id_tts = "ai4bharat/indic-tts-coqui-dravidian-gpu--t4"
+    elif target_lang in ["en", "brx", "mni"]:
+        service_id_tts = "ai4bharat/indic-tts-coqui-misc-gpu--t4"
+
+    # Request headers (unchanged)
+    headers = {
+        "Postman-Token": "<calculated when request is sent>",
+        "Content-Type": "application/json",
+        "Content-Length": "<calculated when request is sent>",
+        "Host": "<calculated when request is sent>",
+        "User-Agent": "PostmanRuntime/7.40.0",
+        "Accept": "/",
+        "Accept-Encoding": "gzip, deflate, br",
+        "Connection": "keep-alive",
+        "Accept": "/",
+        "User-Agent": "Python",
+        "Authorization": bhashini_key
+    }
+
+    # Request body
+    body = {
+        "pipelineTasks": [
+            {
+                "taskType": "translation",
+                "config": {
+                    "language": {
+                        "sourceLanguage": "en",
+                        "targetLanguage": target_lang
+                    },
+                    "serviceId": service_id
+                }
+            },
+            {
+                "taskType": "tts",
+                "config": {
+                    "language": {
+                        "sourceLanguage": target_lang
+                    },
+                    "serviceId": service_id_tts,
+                    "gender": "female",
+                    "samplingRate": 8000
+                }
+            }
+        ],
+        "inputData": {
+            "input": [
+                {
+                    "source": query
+                }
+            ]
+        }
+    }
+
+    # Parse the JSON response
+    response1 = requests.post("https://dhruva-api.bhashini.gov.in/services/inference/pipeline", headers=headers, json=body)
+    response_data = response1.json()
+    audio_data = base64.b64decode(response_data['pipelineResponse'][1]['audio'][0]['audioContent'])
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    filename = f"tts_{timestamp}.wav"
+    file_path = os.path.join(TTS_FOLDER, filename)
+    with open(file_path, "wb") as audio_file:
+        audio_file.write(audio_data)
+    return file_path
 
 # Main Story Generation Function
 def generate_story(user_prompt):
@@ -104,12 +206,11 @@ def generate_story(user_prompt):
         scene_index = db["scene_index"]
         generating = db["generating"]
 
-    print("## Full Story:")
-    print(full_story_text)
-
-    # List to store generated image paths (not stored in shelve)
+    # Lists to store generated image and audio paths
     image_paths = []
+    audio_paths = []
     image_lock = threading.Lock()  # Lock for thread-safe updates to image_paths
+    audio_lock = threading.Lock()  # Lock for thread-safe updates to audio_paths
 
     # Scene Generation Loop
     while generating:
@@ -125,14 +226,26 @@ def generate_story(user_prompt):
             # Append the new scene to memory
             scenes.append({"role": "user", "content": scene})
             db["scenes"] = scenes
-
+        socketio.emit('new_scene', {'scene_text': scene})
+        
         # Generate dialogue and image description
         dialogue = dialogue_gen(scene)
-        image_description = scene
 
+        # Generate TTS audio in a separate thread
+        def save_and_display_audio():
+            audio_path = bhashini_tts(dialogue)
+            if audio_path:
+                with audio_lock:  # Ensure thread-safe updates to audio_paths
+                    audio_paths.append(audio_path)
+                print(f"Audio saved for Scene {scene_index}: {audio_path}")
+                socketio.emit('new_audio', {'audio_url': audio_path})
+
+        threading.Thread(target=save_and_display_audio).start()
+
+        image_description = scene
         print(f"### Scene {scene_index}:")
-        print(scene)
-        print(f"**Dialogue:** {dialogue}")
+        
+
 
         # Generate image prompt with memory of full story and previous prompts
         previous_prompts = [s["content"] for s in scenes[:-1]]  # Exclude current scene
@@ -145,6 +258,7 @@ def generate_story(user_prompt):
                 with image_lock:  # Ensure thread-safe updates to image_paths
                     image_paths.append(image_path)
                 print(f"Image saved for Scene {scene_index}: {image_path}")
+                socketio.emit('new_image', {'image_url': image_path})
 
         threading.Thread(target=save_and_display_image).start()
 
@@ -152,16 +266,30 @@ def generate_story(user_prompt):
         with shelve.open("memory/story_memory") as db:
             db["scene_index"] = scene_index
 
-    print("## Story Generation Complete. Waiting for images to finish rendering...")
+    print("## Story Generation Complete. Waiting for images and audio to finish rendering...")
     print("Generated Images:")
     for img in image_paths:
         print(img)
+    print("Generated Audio Files:")
+    for audio in audio_paths:
+        print(audio)
 
-# Main Function
-def main():
-    user_prompt = input("Enter the topic for the story: ")
-    if user_prompt:
-        generate_story(user_prompt)
+@app.route('/generate', methods=['POST'])
+def generate():
+    if request.method=='POST':
+        # Get the prompt from the frontend
+        data = request.get_json()
+        prompt = data.get('prompt')
+        socketio.start_background_task(target=generate_story, prompt=prompt)
+
+        # Return a response to the frontend that generation has started
+        return jsonify({'status': 'Generation started'})
+
+
+
+@app.route("/test")
+def test():
+    return "It's working"    
 
 if __name__ == "__main__":
-    main()
+    socketio.run(app, debug=True)

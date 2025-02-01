@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="/backend/static/style.css">
 </head>
 <body>
   <div id="particles-js"></div>
@@ -82,7 +82,7 @@
           <button class="icon-btn voice-btn">
             <i class="fas fa-microphone"></i>
           </button>
-          <button type="submit" class="icon-btn submit-btn">
+          <button type="button" class="submit-btn" id="submitBtn">
             <i class="fas fa-paper-plane"></i>
           </button>
         </div>
@@ -98,9 +98,21 @@
         <h3>Visual Insights</h3>
         <p>Visual insights pending.</p>
       </div>
+      <div></div> 
+      <div class="video-reference">
+        <h3>Video References</h3>
+        <label for="language-select">Select Language</label>
+        <select id="language-select" name="language" class="language-select">
+            <option value="english">English</option>
+            <option value="kannada">Kannada</option>
+        </select>
+        <p>Loading relevant videos...</p>
+    </div>
+    
     </main>
+    
 
-    <section class="additional-insights">
+    <!-- <section class="additional-insights">
       <div class="video-reference">
         <h3>Video References</h3>
         <p>Loading relevant videos...</p>
@@ -109,7 +121,7 @@
         <h3>Document Insights</h3>
         <p>Fetching document insights...</p>
       </div>
-    </section>
+    </section> -->
   </div>
 
   <footer class="site-footer">
@@ -119,6 +131,6 @@
   </footer>
 
   <script src="https://cdn.jsdelivr.net/particles.js/2.0.0/particles.min.js"></script>
-  <script src="script.js" type="module"></script>
+  <script src="/backend/static/script.js" type="module"></script>
 </body>
 </html>
