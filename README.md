@@ -36,16 +36,16 @@ IntelliQuery is a Generative AI-powered platform that turns complex topics into 
 
 1. Clone the repository:
    bash
-   git clone https://github.com/your-repo/intelliquery.git
-   cd intelliquery
+   >>git clone https://github.com/your-repo/intelliquery.git
+   >>cd intelliquery
    
 2. Install dependencies:
    bash
-   pip install -r requirements.txt
+   >>pip install -r requirements.txt
    
 3. Start the Flask server:
    bash
-   python app.py
+   >>python app.py
    
 4. Open your browser and visit http://localhost:5000.
 
