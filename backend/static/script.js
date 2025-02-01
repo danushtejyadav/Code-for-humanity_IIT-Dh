@@ -181,10 +181,19 @@ socket.on("connect_error", (err) => {
     console.error("Socket connection failed:", err);
 });
   // Scene Updates
+  // socket.on('new_scene', (data) => {
+  //     const textResponse = document.getElementById('txt-res');
+  //     console.log(textResponse)
+  //     textResponse.innerText += `\n${data.scene_text}\n`;  // Append new scene
+  // });
   socket.on('new_scene', (data) => {
-      const textResponse = document.querySelector('.text-response p');
-      textResponse.innerText += `\n${data.scene_text}\n`;  // Append new scene
-  });
+    const scenesDiv = document.getElementById('scenes');
+    scenesDiv.innerHTML += `<div class="scene">
+        <h3>New Scene</h3>
+        <p>${data.scene_text}</p>
+    </div>`;
+    scenesDiv.scrollTop = scenesDiv.scrollHeight; // Auto-scroll to bottom
+});
   
   // Image Updates
   socket.on('new_image', (data) => {
@@ -209,6 +218,7 @@ socket.on('generation_complete', (data) => {
   console.log("Story Generation Finished:", data.message);
 });
   // Send prompt to backend on button click
+
   document.getElementById('submitBtn').addEventListener('click', () => {
     const prompt = document.querySelector('.search-input').value;
 

@@ -6,6 +6,8 @@ from datetime import datetime
 from groq import Groq
 import shelve
 import re
+import dbm
+from dbm import dumb
 from pydub import AudioSegment
 import base64
 from flask import Flask, request, jsonify , render_template
@@ -192,10 +194,13 @@ def bhashini_tts(query):
         audio_file.write(audio_data)
     return file_path
 
+
 # Main Story Generation Function
 def generate_story(user_prompt):
     # Initialize memory using shelve
-    with shelve.open("memory/story_memory") as db:
+    # print(user_prompt)
+    with shelve.Shelf(dumb.open("memory/story_memory", 'c')) as db:
+    # with shelve.open("memory/story_memory",flag='c') as db:
         if "full_story" not in db:
             db["full_story"] = full_story(user_prompt)
             db["scenes"] = []
@@ -214,7 +219,7 @@ def generate_story(user_prompt):
 
     # Scene Generation Loop
     while generating:
-        with shelve.open("memory/story_memory") as db:
+        with shelve.Shelf(dumb.open("memory/story_memory", 'c')) as db:
             scene = scene_generator(full_story_text, db["scenes"])
             # Check for completion
             pattern = r"(?i)\bscene\s+generation\s+complete\b"
@@ -244,7 +249,7 @@ def generate_story(user_prompt):
 
         image_description = scene
         print(f"### Scene {scene_index}:")
-        
+        print(scene)
 
 
         # Generate image prompt with memory of full story and previous prompts
@@ -280,8 +285,8 @@ def generate():
         # Get the prompt from the frontend
         data = request.get_json()
         prompt = data.get('prompt')
-        socketio.start_background_task(target=generate_story, prompt=prompt)
-
+        print(prompt)
+        socketio.start_background_task(generate_story,prompt)
         # Return a response to the frontend that generation has started
         return jsonify({'status': 'Generation started'})
 

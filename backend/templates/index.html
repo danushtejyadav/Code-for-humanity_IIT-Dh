@@ -82,7 +82,25 @@
           <button class="icon-btn voice-btn">
             <i class="fas fa-microphone"></i>
           </button>
-          <button type="button" class="submit-btn" id="submitBtn">
+          <script>  function generate() {
+            const submitBtn = document.getElementById('submitBtn');
+            console.log(submitBtn);
+            const prompt = document.getElementsByClassName('search-input')[0].value;
+            console.log(prompt);
+            console.log(JSON.stringify({ prompt }))
+
+    console.log("Submit button clicked! Sending prompt...");  // Debugging log
+  
+    fetch('http://127.0.0.1:5000/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt })
+    })
+    .then(response => response.json())
+    .then(data => console.log('Response from server:', data))
+    .catch(error => console.error('Fetch Error:', error));
+          }</script>
+          <button type="button" class="submit-btn" id="submitBtn" onclick="generate()">
             <i class="fas fa-paper-plane"></i>
           </button>
         </div>
@@ -90,8 +108,9 @@
     </header>
 
     <main class="response-grid">
-      <div class="text-response">
+      <div class="text-response" id="txt-res">
         <h3>Text Response</h3>
+        <div id="scenes"></div>
         <p>Awaiting your query.</p>
       </div>
       <div class="image-response">
@@ -131,6 +150,7 @@
   </footer>
 
   <script src="https://cdn.jsdelivr.net/particles.js/2.0.0/particles.min.js"></script>
+  <script src="https://cdn.socket.io/4.7.4/socket.io.min.js"></script>
   <script src="/backend/static/script.js" type="module"></script>
 </body>
 </html>
